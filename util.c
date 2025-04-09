@@ -86,27 +86,27 @@ void changeState( state_t newState )
     pthread_mutex_unlock( &stateMut );
 }
 
-void sortList(struct list_element** head) {
+void sortList(struct list_element** queues, int room) {
     struct list_element* current;
     struct list_element* next;
     int swapped;
 
-    if (*head == NULL) {
+    if (queues[room] == NULL) {
         return;
     }
 
     do {
         swapped = 0;
-        current = *head;
+        current = queues[room];
 
         while (current->next != NULL) {
             next = current->next;
 
             if (current->timestamp > next->timestamp) {
-                if (current == *head) {
-                    *head = next;
+                if (current == queues[room]) {
+                    queues[room] = next;
                 } else {
-                    struct list_element* prev = *head;
+                    struct list_element* prev = queues[room];
                     while (prev->next != current) {
                         prev = prev->next;
                     }
@@ -115,11 +115,11 @@ void sortList(struct list_element** head) {
                 current->next = next->next;
                 next->next = current;
                 swapped = 1;
-            } else if (current->timestamp == next->timestamp && current->source_rank > next->source_rank) {
-                if (current == *head) {
-                    *head = next;
+            } else if (current->timestamp == next->timestamp && current->src > next->src) {
+                if (current == queues[room]) {
+                    queues[room] = next;
                 } else {
-                    struct list_element* prev = *head;
+                    struct list_element* prev = queues[room];
                     while (prev->next != current) {
                         prev = prev->next;
                     }
@@ -135,18 +135,19 @@ void sortList(struct list_element** head) {
     } while (swapped);
 }
 
-void insertNode(struct list_element** head, int timestamp, int source_rank, int type, int target) {
+
+void insertNode(struct list_element** queues, int room, int timestamp, int src, int type, int target) {
     struct list_element* new_node = malloc(sizeof(struct list_element));
-    new_node->source_rank = source_rank;
+    new_node->src = src;
     new_node->timestamp = timestamp;
     new_node->type = type;
     new_node->target = target;
     new_node->next = NULL;
 
-    if (*head == NULL) {
-        *head = new_node;
+    if (queues[room] == NULL) {
+        queues[room] = new_node;
     } else {
-        struct list_element* current = *head;
+        struct list_element* current = queues[room];
         while (current->next != NULL) {
             current = current->next;
         }
@@ -154,21 +155,21 @@ void insertNode(struct list_element** head, int timestamp, int source_rank, int 
     }
 }
 
-void removeNode(struct list_element** head, int source_rank) {
-    if (*head == NULL) {
+void removeNode(struct list_element** queues, int room, int src) {
+    if (queues[room] == NULL) {
         return;
     }
 
-    struct list_element* current = *head;
+    struct list_element* current = queues[room];
     struct list_element* prev = NULL;
 
-    if (current != NULL && current->source_rank == source_rank) {
-        *head = current->next;
+    if (current != NULL && current->src == src) {
+        queues[room] = current->next;
         free(current);
         return;
     }
 
-    while (current != NULL && current->source_rank != source_rank) {
+    while (current != NULL && current->src != src) {
         prev = current;
         current = current->next;
     }
@@ -181,37 +182,39 @@ void removeNode(struct list_element** head, int source_rank) {
     free(current);
 }
 
-void printList(struct list_element* head) {
-    debug("---------------")
-    debug("RANK: %d", rank);
 
-    struct list_element* current = head;
+void printList(struct list_element* queues, int room) {
+    debug("---------------");
+    debug("Queue in Room %d", room);
+
+    struct list_element* current = queues[room];
 
     while (current != NULL) {
-        debug("Source: %d, ts: %d, type: %s, target: %d", current->source_rank, current->timestamp, type_array[current->type], current->target);
+        debug("Source: %d, ts: %d, type: %s, target: %d", current->src, current->timestamp, type_array[current->type], current->target);
         current = current->next;
     }
-    debug("---------------")
+    debug("---------------");
 }
 
-int isElementInNElements(struct list_element* head, int source_rank, int n, int type, int target) {
-    struct list_element* current = head;
+
+int isElementInNElements(struct list_element* queues, int room, int src, int n, int type, int target) {
+    struct list_element* current = queues[room];
     int count = 0;
 
     while (current != NULL && count < n) {
-        if(current != NULL && current->target == target && current->type != type){
+        if (current->target == target && current->type != type) {
             return 0;
         }
 
-        if (current->source_rank == source_rank) {
+        if (current->src == src) {
             return 1;
         }
 
         current = current->next;
-        if(current != NULL && current->target == target) {
+        if (current != NULL && current->target == target) {
             count++;
         }
-
     }
+
     return 0;
 }

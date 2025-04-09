@@ -54,10 +54,10 @@ void changeState( state_t );
 void handleRequest(packet_t);
 
 // kolejka
-void sortList(struct list_element** head);
-void insertNode(struct list_element** head, int timestamp, int source_rank, int type, int target);
-void removeNode(struct list_element** head, int source_rank);
-void printList(struct list_element* head);
-int isElementInNElements(struct list_element* head, int source_rank, int x, int type, int target);
+void sortList(struct list_element** queues, int room);
+void insertNode(struct list_element** queues, int room, int timestamp, int source_rank, int type, int target);
+void removeNode(struct list_element** queues, int room, int source_rank);
+void printList(struct list_element* queues, int room);
+int isElementInNElements(struct list_element* queues, int room, int source_rank, int x, int type, int target);
 
 #endif
