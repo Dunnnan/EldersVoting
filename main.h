@@ -8,6 +8,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <stdbool.h>
 
 #include "util.h"
 /* boolean */
@@ -22,13 +23,30 @@
 extern int rank;
 extern int size;
 extern int ackCount;
+
+extern int relCount;
+
 extern pthread_t threadKom;
 extern int clockLamporta;
 extern sem_t semaphore;
 
+// Zmienne własne :>
+extern packet_t rooms[1][4];
+extern int room;
+extern int game;
+
+// Stałe
+#define ELDERS 6
+#define ROOMS 1
+
+extern packet_t rooms[ROOMS][4];
+
+
 // tabela kolejek
+/*
 #define N 2
 extern struct list_element* queues[N];
+*/
 
 // pojedyncza kolejka
 //extern struct list_element *queueHead;

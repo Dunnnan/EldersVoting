@@ -1,0 +1,7 @@
+FIXED 1. pakiety w rooms[] (zapisywane w sekcji ADD_QUEUE) znikają przed wyczyszczeniem tabeli.
+      2. najprawdopobniej przy przesyłaniu ACK występują jakieś kolizje - jest to niepoprawnie wykonywane (zbyt częste pozwolenia).
+
+
+FIXED:
+      1. pakiety były zapisywane w aktualnie wybranym pokoju procesu (room) a nie w pokoju wskazywanym przez pakiet (pakiet.room).
+      

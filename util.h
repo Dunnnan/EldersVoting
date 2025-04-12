@@ -29,6 +29,8 @@ struct list_element{
 #define RELEASE 3
 #define APP_PKT 4
 #define FINISH  5
+#define ADD_QUEUE 6
+
 
 extern MPI_Datatype MPI_PAKIET_T;
 void inicjuj_typ_pakietu();
@@ -41,7 +43,8 @@ typedef enum {
     InMonitor,
     InWant,
     InSection,
-    InFinish
+    InFinish,
+    Add_Queue
    } state_t;
 
 extern state_t stan;
@@ -55,9 +58,9 @@ void handleRequest(packet_t);
 
 // kolejka
 void sortList(struct list_element** queues, int room);
-void insertNode(struct list_element** queues, int room, int timestamp, int source_rank, int type, int target);
+void insertNode(struct list_element** queues, int room, int timestamp, int src, int game);
 void removeNode(struct list_element** queues, int room, int source_rank);
 void printList(struct list_element* queues, int room);
-int isElementInNElements(struct list_element* queues, int room, int source_rank, int x, int type, int target);
+int isElementInNElements(struct list_element* queues, int room, int src, int x, int game);
 
 #endif

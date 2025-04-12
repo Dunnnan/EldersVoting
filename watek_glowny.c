@@ -9,6 +9,7 @@ void mainLoop()
     int tag;
     int perc;
     sem_init(&semaphore, 0, 1);
+    room = random()%ROOMS;
 
     while (stan != InFinish) {
 	switch (stan) {
@@ -18,6 +19,13 @@ void mainLoop()
                 debug("Perc: %d", perc);
                 println("Ubiegam się o sekcję krytyczną");
                 debug("Zmieniam stan na wysyłanie");
+
+                // Semafor na czekanie aż zbiorą się 4 osoby.
+                sem_wait(&semaphore);
+
+                //Losowanie gry
+                game = random()%3;
+                room = random()%ROOMS;
 
                 packet_t *pkt = malloc(sizeof(packet_t));
                 //pkt->data = perc;
@@ -29,15 +37,10 @@ void mainLoop()
                 for (int i=0;i<=size-1;i++)
                 if (i!=rank)
                     sendPacket( pkt, i, REQUEST);
-                    changeState( InWant ); // w VI naciśnij ctrl-] na nazwie funkcji, ctrl+^ żeby wrócić
-                           // :w żeby zapisać, jeżeli narzeka że w pliku są zmiany
-                           // ewentualnie wciśnij ctrl+w ] (trzymasz ctrl i potem najpierw w, potem ]
-                           // między okienkami skaczesz ctrl+w i strzałki, albo ctrl+ww
-                           // okienko zamyka się :q
-                           // ZOB. regułę tags: w Makefile (naciśnij gf gdy kursor jest na nazwie pliku)
+                    changeState( InWant );
                 free(pkt);
                 debug("Skończyłem myśleć I CHCĘ WEJŚĆ DO SEKCJI BO MAM FAJNY PROCENT");
-            } // a skoro już jesteśmy przy komendach vi, najedź kursorem na } i wciśnij %  (niestety głupieje przy komentarzach :( )
+            }
             else debug("Skończyłem myśleć");
             break;
 	    case InWant:
@@ -48,10 +51,19 @@ void mainLoop()
 
             // Podniesienie semaforu
 
-            if ( ackCount == size - 1) {
-                debug("ZDOBYŁEM ackCOUNT i czekam na semafor");
+            if ( ackCount > size - 4) {
+                debug("ZDOBYŁEM ackCOUNT i czekam na kolegów.");
+
+    		    packet_t *pkt = malloc(sizeof(packet_t));
+
+                for (int i=0;i<=size-1;i++) {
+                    sendPacket( pkt, i, ADD_QUEUE);
+                }
+    		    free(pkt);
+
+
+                println("Wysłałem ADD_QUEUE i czekam na pozostałe osoby.")
                 sem_wait(&semaphore);
-                debug("ZDOBYŁEM semafor i wszedłem do sekcji!");
                 changeState(InSection);
             }
             break;
@@ -59,7 +71,7 @@ void mainLoop()
 	    case InSection:
             // tutaj zapewne jakiś muteks albo zmienna warunkowa
             println("Jestem w sekcji krytycznej")
-            sleep(5);
+            sleep(15);
 		    //if ( perc < 25 ) {
 		    debug("Perc: %d", perc);
 		    println("Wychodzę z sekcji krytycznej")
@@ -68,9 +80,10 @@ void mainLoop()
 		    packet_t *pkt = malloc(sizeof(packet_t));
 		    //pkt->data = perc;
 
-		    for (int i=0;i<=size-1;i++)
-			if (i!=rank)
-			    sendPacket( pkt, (rank+1)%size, RELEASE);
+		    for (int i=0;i<=size-1;i++){
+			    sendPacket( pkt, i, RELEASE);
+            }
+
 		    changeState( InRun );
 
             // Zwolnienie semaforu

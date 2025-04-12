@@ -18,6 +18,9 @@
  */
 int rank, size;
 int clockLamporta = 0;
+int room = -1;
+int game = 0;
+
 /*
  * Każdy proces ma dwa wątki - główny i komunikacyjny
  * w plikach, odpowiednio, watek_glowny.c oraz (siurpryza) watek_komunikacyjny.c
@@ -28,7 +31,7 @@ int clockLamporta = 0;
 pthread_t threadKom;
 //pthread_mutex_t stateMut;
 sem_t semaphore;
-
+packet_t rooms[ROOMS][4];
 
 
 void finalizuj()

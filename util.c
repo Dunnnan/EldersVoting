@@ -21,8 +21,14 @@ pthread_mutex_t stateMut = PTHREAD_MUTEX_INITIALIZER;
 struct tagNames_t{
     const char *name;
     int tag;
-} tagNames[] = { { "pakiet aplikacyjny", APP_PKT }, { "finish", FINISH}, 
-                { "potwierdzenie", ACK}, {"prośbę o sekcję krytyczną", REQUEST}, {"zwolnienie sekcji krytycznej", RELEASE} };
+} tagNames[] = {
+        { "pakiet aplikacyjny", APP_PKT },
+        { "finish", FINISH},
+        { "potwierdzenie", ACK},
+        {"prośbę o sekcję krytyczną", REQUEST},
+        {"czekanie na sekcję krytyczną", RELEASE},
+        {"dodaj mnie do kolejki wskazanego pokoju", ADD_QUEUE}
+};
 
 const char *const tag2string( int tag )
 {
@@ -41,7 +47,7 @@ void inicjuj_typ_pakietu()
     */
     /* sklejone z stackoverflow */
     int       blocklengths[NITEMS] = {1,1,1,1};
-    MPI_Datatype typy[NITEMS] = {MPI_INT, MPI_INT, MPI_INT};
+    MPI_Datatype typy[NITEMS] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT};
     MPI_Aint     offsets[NITEMS];
 
     offsets[0] = offsetof(packet_t, ts);
@@ -49,7 +55,10 @@ void inicjuj_typ_pakietu()
     offsets[2] = offsetof(packet_t, game);
     offsets[3] = offsetof(packet_t, room);
 
+
+
     MPI_Type_create_struct(NITEMS, blocklengths, offsets, typy, &MPI_PAKIET_T);
+
     MPI_Type_commit(&MPI_PAKIET_T);
 }
 
@@ -65,6 +74,8 @@ void sendPacket(packet_t *pkt, int destination, int tag)
 
     pkt->src = rank;
     pkt->ts = clockLamporta;
+    pkt->room = room;
+    pkt->game = game;
 
     pthread_mutex_lock( &stateMut );
     clockLamporta += 1;
@@ -86,6 +97,7 @@ void changeState( state_t newState )
     pthread_mutex_unlock( &stateMut );
 }
 
+/*
 void sortList(struct list_element** queues, int room) {
     struct list_element* current;
     struct list_element* next;
@@ -102,7 +114,7 @@ void sortList(struct list_element** queues, int room) {
         while (current->next != NULL) {
             next = current->next;
 
-            if (current->timestamp > next->timestamp) {
+            if (current->ts > next->ts) {
                 if (current == queues[room]) {
                     queues[room] = next;
                 } else {
@@ -115,7 +127,7 @@ void sortList(struct list_element** queues, int room) {
                 current->next = next->next;
                 next->next = current;
                 swapped = 1;
-            } else if (current->timestamp == next->timestamp && current->src > next->src) {
+            } else if (current->ts == next->ts && current->src > next->src) {
                 if (current == queues[room]) {
                     queues[room] = next;
                 } else {
@@ -136,12 +148,12 @@ void sortList(struct list_element** queues, int room) {
 }
 
 
-void insertNode(struct list_element** queues, int room, int timestamp, int src, int type, int target) {
+void insertNode(struct list_element** queues, int room, int ts, int src, int game, int room) {
     struct list_element* new_node = malloc(sizeof(struct list_element));
     new_node->src = src;
-    new_node->timestamp = timestamp;
-    new_node->type = type;
-    new_node->target = target;
+    new_node->ts = ts;
+    new_node->game = game;
+    new_node->room = room;
     new_node->next = NULL;
 
     if (queues[room] == NULL) {
@@ -190,19 +202,19 @@ void printList(struct list_element* queues, int room) {
     struct list_element* current = queues[room];
 
     while (current != NULL) {
-        debug("Source: %d, ts: %d, type: %s, target: %d", current->src, current->timestamp, type_array[current->type], current->target);
+        debug("Source: %d, ts: %d, type: %s, room: %d", current->src, current->ts, type_array[current->type], current->room);
         current = current->next;
     }
     debug("---------------");
 }
 
 
-int isElementInNElements(struct list_element* queues, int room, int src, int n, int type, int target) {
+int isElementInNElements(struct list_element* queues, int room, int src, int n, int game, int room) {
     struct list_element* current = queues[room];
     int count = 0;
 
     while (current != NULL && count < n) {
-        if (current->target == target && current->type != type) {
+        if (current->room == room && current->game != game) {
             return 0;
         }
 
@@ -211,10 +223,11 @@ int isElementInNElements(struct list_element* queues, int room, int src, int n, 
         }
 
         current = current->next;
-        if (current != NULL && current->target == target) {
+        if (current != NULL && current->room == room) {
             count++;
         }
     }
 
     return 0;
 }
+*/
