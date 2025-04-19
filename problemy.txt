@@ -1,7 +1,48 @@
 FIXED 1. pakiety w rooms[] (zapisywane w sekcji ADD_QUEUE) znikają przed wyczyszczeniem tabeli.
       2. najprawdopobniej przy przesyłaniu ACK występują jakieś kolizje - jest to niepoprawnie wykonywane (zbyt częste pozwolenia).
+        a. źle naliczane relCount - zmiana pokoi w trakcie RELEASE
+        b. mniej niż 4 procesy są wpuszczane do sekcji.
+
+      3. 4 procesy są w sekcji
+        , inny proces zaczyna się ubiegać o pokój
+        , rozsyła REQ
+        , otrzymuje 4 RELEASE - rozsyła REQ ponownie
+        , o ile jego ackCount zostanie wyzerowany, o tyle nie wiadomo, czy ktoś mu nie przyśle
+        nadmiarowego ACK.
+
+
+
 
 
 FIXED:
       1. pakiety były zapisywane w aktualnie wybranym pokoju procesu (room) a nie w pokoju wskazywanym przez pakiet (pakiet.room).
-      
+
+
+
+
+
+
+
+
+
+
+
+w tym widzę jednak główny problem
+przykładowo:
+***clock [2] : [1] Ubiegam się o sekcję krytyczną***
+***clock [3] : [1] Wysyłam REQ do [2]***
+clock [1] : [2] Odsyłam ACK (nie ubiegam się, max(ts,pakiet.ts) +  1 )
+
+***clock [4] : [1] Otrzymuję ACK ***
+***clock [5] : [1] Otrzymuję ACK ***
+***clock [6] : [1] Otrzymuję ACK***
+***clock [7] : [1] Otrzymuję ACK ***
+***clock [8] : [1] Otrzymuję ACK ***
+***clock [9] : [1] Otrzymuję ACK***
+***clock [10] : [1] Otrzymuję ACK ***
+***clock [11] : [1] Otrzymuję ACK***
+***clock [12] : [1] Otrzymuję ACK***
+
+clock [4] : [2] Ubiegam się o sekcję krytyczną
+clock [5] : [2] Wysyłam REQ do ***[1]***
+***clock [12] : [1] Odsyłam ACK (też się ubiegam, ale nie zebrałem jeszcze odpowiedniej liczby ACK, a REQ ma < clock)***

@@ -28,16 +28,17 @@ extern int relCount;
 
 extern pthread_t threadKom;
 extern int clockLamporta;
+extern int lastRequestTS;
 extern sem_t semaphore;
 
 // Zmienne własne :>
-extern packet_t rooms[1][4];
 extern int room;
 extern int game;
+extern int request_id;
 
 // Stałe
 #define ELDERS 6
-#define ROOMS 1
+#define ROOMS 2
 
 extern packet_t rooms[ROOMS][4];
 

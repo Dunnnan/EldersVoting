@@ -4,13 +4,14 @@
 
 /* typ pakietu */
 typedef struct {
-    int ts;       /* timestamp (zegar lamporta */
-    int src;      /* source    (id procesu wysyłającego) */
-    int game;     /* game      (id gry) */
-    int room;     /* source    (id pokoju) */
+    int ts;             /* timestamp   (zegar lamporta */
+    int src;            /* source      (id procesu wysyłającego) */
+    int game;           /* game        (id gry) */
+    int room;           /* source      (id pokoju) */
+    int request_id;     /* request_id  (id requesta) */
 } packet_t;
 /* packet_t ma trzy pola, więc NITEMS=3. Wykorzystane w inicjuj_typ_pakietu */
-#define NITEMS 4
+#define NITEMS 5
 
 // kolejka
 struct list_element{
@@ -30,6 +31,7 @@ struct list_element{
 #define APP_PKT 4
 #define FINISH  5
 #define ADD_QUEUE 6
+#define WAITING 7
 
 
 extern MPI_Datatype MPI_PAKIET_T;
@@ -39,13 +41,14 @@ void inicjuj_typ_pakietu();
 void sendPacket(packet_t *pkt, int destination, int tag);
 
 typedef enum {
-    InRun,
-    InMonitor,
-    InWant,
-    InSection,
-    InFinish,
-    Add_Queue
-   } state_t;
+    InRun,      // 0
+    InMonitor,  // 1
+    InWant,     // 2
+    InSection,  // 3
+    InFinish,   // 4
+    Add_Queue,  // 5
+    Waiting     // 6
+   } state_t;   // 7
 
 extern state_t stan;
 extern pthread_mutex_t stateMut;

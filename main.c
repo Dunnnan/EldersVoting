@@ -17,9 +17,11 @@
  *
  */
 int rank, size;
-int clockLamporta = 0;
+int clockLamporta = 1;
+int lastRequestTS = 0;
 int room = -1;
 int game = 0;
+int request_id = 0;
 
 /*
  * Każdy proces ma dwa wątki - główny i komunikacyjny

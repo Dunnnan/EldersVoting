@@ -27,7 +27,8 @@ struct tagNames_t{
         { "potwierdzenie", ACK},
         {"prośbę o sekcję krytyczną", REQUEST},
         {"czekanie na sekcję krytyczną", RELEASE},
-        {"dodaj mnie do kolejki wskazanego pokoju", ADD_QUEUE}
+        {"dodaj mnie do kolejki wskazanego pokoju", ADD_QUEUE},
+        {"czekam na kolegów, bo zebrałem wystarczająco ack", WAITING},
 };
 
 const char *const tag2string( int tag )
@@ -46,14 +47,15 @@ void inicjuj_typ_pakietu()
        brzydzimy się czymś w rodzaju MPI_Send(&typ, sizeof(pakiet_t), MPI_BYTE....
     */
     /* sklejone z stackoverflow */
-    int       blocklengths[NITEMS] = {1,1,1,1};
-    MPI_Datatype typy[NITEMS] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT};
+    int       blocklengths[NITEMS] = {1,1,1,1,1};
+    MPI_Datatype typy[NITEMS] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT};
     MPI_Aint     offsets[NITEMS];
 
     offsets[0] = offsetof(packet_t, ts);
     offsets[1] = offsetof(packet_t, src);
     offsets[2] = offsetof(packet_t, game);
     offsets[3] = offsetof(packet_t, room);
+    offsets[4] = offsetof(packet_t, request_id);
 
 
 
@@ -76,10 +78,6 @@ void sendPacket(packet_t *pkt, int destination, int tag)
     pkt->ts = clockLamporta;
     pkt->room = room;
     pkt->game = game;
-
-    pthread_mutex_lock( &stateMut );
-    clockLamporta += 1;
-	pthread_mutex_unlock( &stateMut );
 
     MPI_Send( pkt, 1, MPI_PAKIET_T, destination, tag, MPI_COMM_WORLD);
     debug("Wysyłam %s do %d\n", tag2string( tag), destination);
