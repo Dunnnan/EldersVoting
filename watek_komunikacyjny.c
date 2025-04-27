@@ -23,13 +23,15 @@ void *startKomWatek(void *ptr)
 	    case REQUEST: 
             debug("Ktoś coś prosi. A niech ma!")
             //println("Dostałem REQ. Czy wyślę ACK? REQ.ts: %d ? %d : myLastREQ.ts | stan: %d | room: %d | mojRoom: %d | od: %d",pakiet.ts, lastRequestTS, stan, pakiet.room, room, pakiet.src);
+            pthread_mutex_lock(&ackQueue_mutex);
             if
             (
+                pakiet.room != room ||
                 (
                 ((pakiet.ts < lastRequestTS && pakiet.room == room) || (pakiet.ts == lastRequestTS && pakiet.src < rank && pakiet.room == room) ||
                 stan != InWant)
                 &&
-                stan != Waiting && stan != InSection) || pakiet.room != room
+                stan != Waiting && stan != InSection)
             ) {
 
                 packet_t *pkt = malloc(sizeof(packet_t));
@@ -47,6 +49,14 @@ void *startKomWatek(void *ptr)
 
 		        sendPacket( pkt, status.MPI_SOURCE, ACK );
             }
+            else {
+
+                ackQueue[last] = pakiet.src;
+                last++;
+
+
+            }
+            pthread_mutex_unlock(&ackQueue_mutex);
 /*
             else {
                 // Podmień .ts
@@ -67,13 +77,15 @@ void *startKomWatek(void *ptr)
             pthread_mutex_unlock( &stateMut );
 */
             pthread_mutex_lock(&stateMut);
-	        if (pakiet.request_id == request_id) {
-                ackCount++;
-                //println("Dostałem ACK od %d", pakiet.src);
-                }
-            else {
-                println("Zignorowano ACK od %d - stary request_id", pakiet.src);
-            }
+
+            ackCount++;
+//	        if (pakiet.request_id == request_id) {
+//                ackCount++;
+//                //println("Dostałem ACK od %d", pakiet.src);
+//                }
+//            else {
+//                println("Zignorowano ACK od %d - stary request_id", pakiet.src);
+//            }
             pthread_mutex_unlock(&stateMut);
 
             //println("Dostałem ACK od %d, mam już %d", status.MPI_SOURCE, ackCount)
@@ -88,57 +100,6 @@ void *startKomWatek(void *ptr)
             memset(&rooms[pakiet.room][2], 0, sizeof(packet_t));
             memset(&rooms[pakiet.room][3], 0, sizeof(packet_t));
 
-
-
-            if (pakiet.room == room ) { // Jeżeli zaczniemy się ubiegać w trakcie przetwarzania Releasów, to część z nich
-                 relCount++;           // zwiększy relCount, a część nie = nie będzie wyzerowania ackCount i ponownego rozesłania REQ
-
-//                if (relCount == 1) {
-//
-//                }
-
-            }
-
-            /*
-	        // Podmień .ts
-            pthread_mutex_lock( &stateMut );
-            if (pakiet.ts > clockLamporta) clockLamporta = pakiet.ts + 1;
-            else clockLamporta += 1;
-            pthread_mutex_unlock( &stateMut );
-            */
-
-            //println("Dostałem RELEASE od %d, mam już %d", status.MPI_SOURCE, relCount);
-            debug("Dostałem RELEASE od %d", status.MPI_SOURCE);
-            if (pakiet.room == room && relCount == 4) {
-                debug("Ponawia rozesłanie REQUEST");
-
-                pthread_mutex_lock(&stateMut);
-                ackCount = 0;
-                pthread_mutex_unlock(&stateMut);
-
-                //println("Czyszczę rooms !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! relCount: %d", relCount);
-
-
-       		    packet_t *pkt = malloc(sizeof(packet_t));
-
-
-                if (stan == InWant) {
-
-                    pthread_mutex_lock(&stateMut);
-                    request_id++;
-                    pkt->request_id = request_id;
-                    pthread_mutex_unlock(&stateMut);
-
-                    for (int i=0;i<=size-1;i++) {
-                        if (i!=rank)
-                            sendPacket( pkt, i, REQUEST);
-                        }
-                }
-
-
-                relCount = 0;
-    		    free(pkt);
-            }
             break;
 
         case ADD_QUEUE:
@@ -147,7 +108,8 @@ void *startKomWatek(void *ptr)
 
             isAdded = false;
             int index = 0;
-            while (index != 4) {
+            while (index < 4) {
+                if (index > 3) println("INDEX JEST WIĘKSZY NIŻ POWINIEN | room: %d | src: %d", room, pakiet.src);
                 //println("index w ADD_QUEUE: %d : .ts = %d, .src = %d, room: %d ", index, rooms[pakiet.room][index].ts, rooms[pakiet.room][index].src, pakiet.room);
                 if (rooms[pakiet.room][index].ts == 0) {
                     isAdded = true;
@@ -160,14 +122,47 @@ void *startKomWatek(void *ptr)
                             rooms[pakiet.room][2].src == rank ||
                             rooms[pakiet.room][3].src == rank
                         ) {
+
+                            // Zliczanie głosów
+                            int oldestGame = -1;
+                            int gameOne = 0;
+                            int gameTwo = 0;
+                            int gameThree = 0;
+
+                            for (int i = 0; i < 4; i++) {
+                                if (rooms[pakiet.room][i].game == 0) gameOne++;
+                                if (rooms[pakiet.room][i].game == 1) gameTwo++;
+                                if (rooms[pakiet.room][i].game == 2) gameThree++;
+                                if (rooms[pakiet.room][i].src > oldestGame) oldestGame = rooms[pakiet.room][i].src;
+                            }
+
+                            if (gameOne >= 2 && gameTwo < 2 && gameThree < 2) {
+                                println("Rżniemy w karty: Rozbierany poker");
+                            }
+                            else if (gameTwo >= 2 && gameOne < 2 && gameThree < 2) {
+                                println("Rżniemy w karty: Brydż");
+                            }
+                            else if (gameThree >= 2 && gameOne < 2 && gameTwo < 2) {
+                                println("Rżniemy w karty: Wist");
+                            }
+                            else {
+                                println("Rżniemy w cokolwiek podyktuje młodziak : %d %d %d %d", rooms[pakiet.room][0].game, rooms[pakiet.room][1].game, rooms[pakiet.room][2].game, rooms[pakiet.room][3].game);
+                            }
+
                             stan = InSection;
                             sem_post(&semaphore);
                             //println("Rżniemy w karty - wszedłem do sekcji krytycznej. Pokój: %d ", rooms[pakiet.room][0].room);
                         }
+
+                        memset(&rooms[pakiet.room][0], 0, sizeof(packet_t));
+                        memset(&rooms[pakiet.room][1], 0, sizeof(packet_t));
+                        memset(&rooms[pakiet.room][2], 0, sizeof(packet_t));
+                        memset(&rooms[pakiet.room][3], 0, sizeof(packet_t));
                     }
+
                 }
-                if (isAdded) break;
                 index++;
+                if (isAdded) break;
             }
 
             isAdded = false;

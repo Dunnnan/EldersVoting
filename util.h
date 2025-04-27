@@ -53,6 +53,10 @@ typedef enum {
 extern state_t stan;
 extern pthread_mutex_t stateMut;
 
+
+extern pthread_mutex_t ackQueue_mutex;
+
+
 /* zmiana stanu, obwarowana muteksem */
 void changeState( state_t );
 

@@ -35,6 +35,9 @@ pthread_t threadKom;
 sem_t semaphore;
 packet_t rooms[ROOMS][4];
 
+int last = 0;
+int ackQueue[10000];
+
 
 void finalizuj()
 {
@@ -73,6 +76,10 @@ void check_thread_support(int provided)
 
 int main(int argc, char **argv)
 {
+
+    //Inicjalizuj (ackQueue)
+    for (int i = 0; i < 10000; i++) ackQueue[i] = -1;
+
     MPI_Status status;
     int provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);

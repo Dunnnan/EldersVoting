@@ -17,6 +17,8 @@ state_t stan=InRun;
  */
 pthread_mutex_t stateMut = PTHREAD_MUTEX_INITIALIZER;
 
+pthread_mutex_t ackQueue_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 
 struct tagNames_t{
     const char *name;

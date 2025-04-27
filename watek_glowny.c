@@ -70,7 +70,7 @@ void mainLoop()
             if ( ackCount >= size - 4) {
                 debug("ZDOBYŁEM ackCOUNT i czekam na kolegów.");
 
-                println("ZDOBYŁEM ackCOUNT i czekam na kolegów. room: %d, ackCount: %d", room, ackCount);
+                //println("ZDOBYŁEM ackCOUNT i czekam na kolegów. room: %d, ackCount: %d", room, ackCount);
 
                 changeState(Waiting);
 
@@ -93,13 +93,13 @@ void mainLoop()
 	    case InSection:
             // tutaj zapewne jakiś muteks albo zmienna warunkowa
             println("Jestem w sekcji krytycznej. room: %d", room);
-            sleep(4);
+            sleep(1);
 
             // Wyzeruj room
-            memset(&rooms[room][0], 0, sizeof(packet_t));
-            memset(&rooms[room][1], 0, sizeof(packet_t));
-            memset(&rooms[room][2], 0, sizeof(packet_t));
-            memset(&rooms[room][3], 0, sizeof(packet_t));
+            //memset(&rooms[room][0], 0, sizeof(packet_t));
+            //memset(&rooms[room][1], 0, sizeof(packet_t));
+            //memset(&rooms[room][2], 0, sizeof(packet_t));
+            //memset(&rooms[room][3], 0, sizeof(packet_t));
 
             pthread_mutex_lock(&stateMut);
             ackCount = 0;
@@ -115,17 +115,28 @@ void mainLoop()
 		    packet_t *pkt = malloc(sizeof(packet_t));
 		    //pkt->data = perc;
 
+
+//		    for (int i=0;i<=size-1;i++){
+//			    sendPacket( pkt, i, RELEASE);
+//            }
+
+            //sleep(2);
+
+            pthread_mutex_lock(&ackQueue_mutex);
+            for (int i = 0; i < 10000; i++) {
+                if (ackQueue[i] == -1) break;
+
+			    sendPacket( pkt, ackQueue[i], ACK);
+			    ackQueue[i] = -1;
+            }
+            last = 0;
+            pthread_mutex_unlock(&ackQueue_mutex);
+
 		    changeState( InRun );
 
-		    for (int i=0;i<=size-1;i++){
-			    sendPacket( pkt, i, RELEASE);
-            }
-
-
-            //sleep(1);
 		    println("Wychodzę z sekcji krytycznej. room: %d", room)
 
-            room = -1;
+            //room = -1;
 
             // Zwolnienie semaforu
 
@@ -133,6 +144,7 @@ void mainLoop()
             sem_post(&semaphore);
             debug("WŁAŚNIE ZWOLNIŁEM SEMAFOR");
 
+            //sleep(5);
 
 		//}
 		    break;

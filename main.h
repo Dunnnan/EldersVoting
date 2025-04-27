@@ -38,9 +38,12 @@ extern int request_id;
 
 // Stałe
 #define ELDERS 6
-#define ROOMS 2
+#define ROOMS 3
 
 extern packet_t rooms[ROOMS][4];
+
+extern int last;
+extern int ackQueue[10000];
 
 
 // tabela kolejek
