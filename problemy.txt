@@ -1,22 +1,24 @@
 FIXED 1. pakiety w rooms[] (zapisywane w sekcji ADD_QUEUE) znikają przed wyczyszczeniem tabeli.
-      2. najprawdopobniej przy przesyłaniu ACK występują jakieś kolizje - jest to niepoprawnie wykonywane (zbyt częste pozwolenia).
+FIXED 2. najprawdopobniej przy przesyłaniu ACK występują jakieś kolizje - jest to niepoprawnie wykonywane (zbyt częste pozwolenia).
         a. źle naliczane relCount - zmiana pokoi w trakcie RELEASE
         b. mniej niż 4 procesy są wpuszczane do sekcji.
 
-      3. 4 procesy są w sekcji
+FIXED 3. 4 procesy są w sekcji
         , inny proces zaczyna się ubiegać o pokój
         , rozsyła REQ
         , otrzymuje 4 RELEASE - rozsyła REQ ponownie
         , o ile jego ackCount zostanie wyzerowany, o tyle nie wiadomo, czy ktoś mu nie przyśle
         nadmiarowego ACK.
-
-
+      4. Do sekcji wchodzi 5 procesów, a następnie 3 - coś jest nie tak z wchodzeniem do sekcji (tablica Rooms / ackCount)
+         , liczba się dopełnia do wielokrotności 4 - 5+3 = 8
+         , dane nie są więc tracone ale dziwnie przetwarzane
 
 
 
 FIXED:
       1. pakiety były zapisywane w aktualnie wybranym pokoju procesu (room) a nie w pokoju wskazywanym przez pakiet (pakiet.room).
-
+      2. zastąpiono ponowne rozsyłanie ack kolejką.
+      3. zastąpiono ponowne rozsyłanie ack kolejką.
 
 
 

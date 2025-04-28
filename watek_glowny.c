@@ -8,7 +8,9 @@ void mainLoop()
     srandom(rank);
     int tag;
     int perc;
-    sem_init(&semaphore, 0, 1);
+
+    // Semafor na czekanie aż zbiorą się 4 osoby.
+    sem_init(&inSection, 0, 1);
     room = random()%ROOMS;
 
     while (stan != InFinish) {
@@ -16,142 +18,90 @@ void mainLoop()
 	    case InRun: 
             perc = random()%100;
 
-
-
             if ( perc < 25 ) {
-                debug("Perc: %d", perc);
                 //println("Ubiegam się o sekcję krytyczną");
                 debug("Zmieniam stan na wysyłanie");
 
                 // Semafor na czekanie aż zbiorą się 4 osoby.
-                sem_wait(&semaphore);
+                sem_wait(&inSection);
 
-                //Losowanie gry
+                //Losuj grę i pokój
                 game = random()%3;
                 room = random()%ROOMS;
 
+                // Inicjalizuj ubieganie się
+                resetACK();
+                incrementClock();
+                rememberRequestTS();
+
+                // Wyślij requesty
                 packet_t *pkt = malloc(sizeof(packet_t));
-                //pkt->data = perc;
-
-                pthread_mutex_lock(&stateMut);
-                ackCount = 0;
-                pthread_mutex_unlock(&stateMut);
-
-                pthread_mutex_lock( &stateMut );
-                clockLamporta += 1;
-                pthread_mutex_unlock( &stateMut );
-
-                pthread_mutex_lock(&stateMut);
-                lastRequestTS = clockLamporta;
-                request_id++;
-                pkt->request_id = request_id;
-                pthread_mutex_unlock(&stateMut);
-
                 for (int i=0;i<=size-1;i++)
                 if (i!=rank)
                     sendPacket( pkt, i, REQUEST);
+                free(pkt);
 
-
+                // Zacznij ubiegać się o sekcję
                 changeState( InWant );
 
-                free(pkt);
                 debug("Skończyłem myśleć I CHCĘ WEJŚĆ DO SEKCJI BO MAM FAJNY PROCENT");
             }
             else debug("Skończyłem myśleć");
+
             break;
 	    case InWant:
-            println("Czekam na wejście do sekcji krytycznej. relCount: %d", relCount);
 
-            // tutaj zapewne jakiś semafor albo zmienna warunkowa
-            // bo aktywne czekanie jest BUE
+            // Czekaj aż uzyskasz ackCount
+            if (ackCount >= size - 4) {
 
-            // Podniesienie semaforu
-
-            if ( ackCount >= size - 4) {
                 debug("ZDOBYŁEM ackCOUNT i czekam na kolegów.");
-
-                //println("ZDOBYŁEM ackCOUNT i czekam na kolegów. room: %d, ackCount: %d", room, ackCount);
-
                 changeState(Waiting);
 
-    		    packet_t *pkt = malloc(sizeof(packet_t));
-
+                // Wyślij dodanie do kolejki pokoju
+                packet_t *pkt = malloc(sizeof(packet_t));
                 for (int i=0;i<=size-1;i++) {
                     sendPacket( pkt, i, ADD_QUEUE);
                 }
-    		    free(pkt);
+                free(pkt);
 
+                // Czekaj na wejście do sekcji
+                sem_wait(&inSection);
 
-                //println("Wysłałem ADD_QUEUE i czekam na pozostałe osoby.")
-                sem_wait(&semaphore);
-
-
+                // Wejdź do sekcji
                 changeState(InSection);
+
             }
+
             break;
 
 	    case InSection:
-            // tutaj zapewne jakiś muteks albo zmienna warunkowa
             println("Jestem w sekcji krytycznej. room: %d", room);
             sleep(1);
 
-            // Wyzeruj room
-            //memset(&rooms[room][0], 0, sizeof(packet_t));
-            //memset(&rooms[room][1], 0, sizeof(packet_t));
-            //memset(&rooms[room][2], 0, sizeof(packet_t));
-            //memset(&rooms[room][3], 0, sizeof(packet_t));
-
-            pthread_mutex_lock(&stateMut);
-            ackCount = 0;
-            pthread_mutex_unlock(&stateMut);
-
-
-
-		    //if ( perc < 25 ) {
-		    debug("Perc: %d", perc);
-
-		    debug("Zmieniam stan na wysyłanie");
-
-		    packet_t *pkt = malloc(sizeof(packet_t));
-		    //pkt->data = perc;
-
-
-//		    for (int i=0;i<=size-1;i++){
-//			    sendPacket( pkt, i, RELEASE);
-//            }
-
-            //sleep(2);
-
-            pthread_mutex_lock(&ackQueue_mutex);
-            for (int i = 0; i < 10000; i++) {
-                if (ackQueue[i] == -1) break;
-
-			    sendPacket( pkt, ackQueue[i], ACK);
-			    ackQueue[i] = -1;
-            }
-            last = 0;
-            pthread_mutex_unlock(&ackQueue_mutex);
-
-		    changeState( InRun );
+            // Wyzeruj ACK
+            resetACK();
 
 		    println("Wychodzę z sekcji krytycznej. room: %d", room)
 
-            //room = -1;
+            // Zresetuj pokój
+            room = -1;
+
+            // Wyjdź z sekcji
+		    changeState( InRun );
+
+            // Roześlij zapamiętane ACK
+            resendACK();
 
             // Zwolnienie semaforu
-
-		    free(pkt);
-            sem_post(&semaphore);
+            sem_post(&inSection);
             debug("WŁAŚNIE ZWOLNIŁEM SEMAFOR");
 
-            //sleep(5);
 
-		//}
 		    break;
 	    default: 
 		    break;
         }
         sleep(SEC_IN_STATE);
     }
-    sem_destroy(&semaphore);
+    sem_destroy(&inSection);
 }

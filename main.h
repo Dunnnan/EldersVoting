@@ -17,45 +17,29 @@
 #define SEC_IN_STATE 1
 #define STATE_CHANGE_PROB 10
 
+// Stałe
 #define ROOT 0
+#define ROOMS 3             // liczba pokoi
+#define ackQueue_SIZE 10000 // rozmiar kolejki przechowującej id procesów, którym początkowo nie wysłaliśmy ACK ( > size)
 
-/* tutaj TYLKO zapowiedzi - definicje w main.c */
-extern int rank;
-extern int size;
+// Zmienne wątku (komunikacyjne)
 extern int ackCount;
-
-extern int relCount;
-
-extern pthread_t threadKom;
 extern int clockLamporta;
 extern int lastRequestTS;
-extern sem_t semaphore;
+extern int last;
+extern int ackQueue[ackQueue_SIZE];
 
-// Zmienne własne :>
+// Zmienne pakietu
+extern int rank;
+extern int size;
 extern int room;
 extern int game;
-extern int request_id;
 
-// Stałe
-#define ELDERS 6
-#define ROOMS 3
+// wątek komunikacyjny
+extern pthread_t threadKom;
 
+// Kolejka oczekujących graczy pokoju
 extern packet_t rooms[ROOMS][4];
-
-extern int last;
-extern int ackQueue[10000];
-
-
-// tabela kolejek
-/*
-#define N 2
-extern struct list_element* queues[N];
-*/
-
-// pojedyncza kolejka
-//extern struct list_element *queueHead;
-
-
 
 /* macro debug - działa jak printf, kiedy zdefiniowano
    DEBUG, kiedy DEBUG niezdefiniowane działa jak instrukcja pusta 

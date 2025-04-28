@@ -7,36 +7,24 @@
 #include "watek_komunikacyjny.c"
 #include "util.c"
 
-
-/*
- * W main.h extern int rank (zapowiedź) w main.c int rank (definicja)
- * Zwróćcie uwagę, że każdy proces ma osobą pamięć, ale w ramach jednego
- * procesu wątki współdzielą zmienne - więc dostęp do nich powinien
- * być obwarowany muteksami. Rank i size akurat są write-once, więc nie trzeba,
- * ale zob util.c oraz util.h - zmienną state_t state i funkcję changeState
- *
- */
-int rank, size;
+// Zmienne wątku (komunikacyjne)
+int ackCount = 0;
 int clockLamporta = 1;
 int lastRequestTS = 0;
+int last = 0;
+int ackQueue[ackQueue_SIZE];
+
+// Zmienne pakietu
+int rank;
+int size;
 int room = -1;
 int game = 0;
-int request_id = 0;
 
-/*
- * Każdy proces ma dwa wątki - główny i komunikacyjny
- * w plikach, odpowiednio, watek_glowny.c oraz (siurpryza) watek_komunikacyjny.c
- *
- *
- */
-
+// wątek komunikacyjny
 pthread_t threadKom;
-//pthread_mutex_t stateMut;
-sem_t semaphore;
-packet_t rooms[ROOMS][4];
 
-int last = 0;
-int ackQueue[10000];
+// Kolejka oczekujących graczy pokoju
+packet_t rooms[ROOMS][4];
 
 
 void finalizuj()
@@ -78,7 +66,7 @@ int main(int argc, char **argv)
 {
 
     //Inicjalizuj (ackQueue)
-    for (int i = 0; i < 10000; i++) ackQueue[i] = -1;
+    for (int i = 0; i < ackQueue_SIZE; i++) ackQueue[i] = -1;
 
     MPI_Status status;
     int provided;

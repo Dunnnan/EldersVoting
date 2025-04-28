@@ -4,20 +4,13 @@
 
 MPI_Datatype MPI_PAKIET_T;
 
-/* 
- * w util.h extern state_t stan (czyli zapowiedź, że gdzieś tam jest definicja
- * tutaj w util.c state_t stan (czyli faktyczna definicja)
- */
+// Zmienne synchronizacyjne
+pthread_mutex_t stateMut = PTHREAD_MUTEX_INITIALIZER;       // do bezpiecznej  zmiany stanu i zmiennych z nim związanych
+pthread_mutex_t ackQueue_mutex = PTHREAD_MUTEX_INITIALIZER; // do bezpiecznego operowania na procesach, którym początkowo nie wysłaliśmy ACK
+sem_t inSection;                                            // do bezpiecznego wchodzenia do sekcji
+sem_t enoughACK;                                            // do bezpiecznego wchodzenia w stan oczekiwania na innych graczy
+
 state_t stan=InRun;
-
-/* zamek wokół zmiennej współdzielonej między wątkami. 
- * Zwróćcie uwagę, że każdy proces ma osobą pamięć, ale w ramach jednego
- * procesu wątki współdzielą zmienne - więc dostęp do nich powinien
- * być obwarowany muteksami
- */
-pthread_mutex_t stateMut = PTHREAD_MUTEX_INITIALIZER;
-
-pthread_mutex_t ackQueue_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 struct tagNames_t{
@@ -28,7 +21,6 @@ struct tagNames_t{
         { "finish", FINISH},
         { "potwierdzenie", ACK},
         {"prośbę o sekcję krytyczną", REQUEST},
-        {"czekanie na sekcję krytyczną", RELEASE},
         {"dodaj mnie do kolejki wskazanego pokoju", ADD_QUEUE},
         {"czekam na kolegów, bo zebrałem wystarczająco ack", WAITING},
 };
@@ -49,16 +41,14 @@ void inicjuj_typ_pakietu()
        brzydzimy się czymś w rodzaju MPI_Send(&typ, sizeof(pakiet_t), MPI_BYTE....
     */
     /* sklejone z stackoverflow */
-    int       blocklengths[NITEMS] = {1,1,1,1,1};
-    MPI_Datatype typy[NITEMS] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT, MPI_INT};
+    int       blocklengths[NITEMS] = {1,1,1,1};
+    MPI_Datatype typy[NITEMS] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT};
     MPI_Aint     offsets[NITEMS];
 
     offsets[0] = offsetof(packet_t, ts);
     offsets[1] = offsetof(packet_t, src);
     offsets[2] = offsetof(packet_t, game);
     offsets[3] = offsetof(packet_t, room);
-    offsets[4] = offsetof(packet_t, request_id);
-
 
 
     MPI_Type_create_struct(NITEMS, blocklengths, offsets, typy, &MPI_PAKIET_T);
@@ -86,6 +76,7 @@ void sendPacket(packet_t *pkt, int destination, int tag)
     if (freepkt) free(pkt);
 }
 
+// Zmień stan
 void changeState( state_t newState )
 {
     pthread_mutex_lock( &stateMut );
@@ -97,137 +88,90 @@ void changeState( state_t newState )
     pthread_mutex_unlock( &stateMut );
 }
 
-/*
-void sortList(struct list_element** queues, int room) {
-    struct list_element* current;
-    struct list_element* next;
-    int swapped;
-
-    if (queues[room] == NULL) {
-        return;
-    }
-
-    do {
-        swapped = 0;
-        current = queues[room];
-
-        while (current->next != NULL) {
-            next = current->next;
-
-            if (current->ts > next->ts) {
-                if (current == queues[room]) {
-                    queues[room] = next;
-                } else {
-                    struct list_element* prev = queues[room];
-                    while (prev->next != current) {
-                        prev = prev->next;
-                    }
-                    prev->next = next;
-                }
-                current->next = next->next;
-                next->next = current;
-                swapped = 1;
-            } else if (current->ts == next->ts && current->src > next->src) {
-                if (current == queues[room]) {
-                    queues[room] = next;
-                } else {
-                    struct list_element* prev = queues[room];
-                    while (prev->next != current) {
-                        prev = prev->next;
-                    }
-                    prev->next = next;
-                }
-                current->next = next->next;
-                next->next = current;
-                swapped = 1;
-            }
-
-            current = next;
-        }
-    } while (swapped);
+// Nadpisz clock w przypadku otrzymania wiadomości o większym .ts
+void pickHigherClock( packet_t pakiet) {
+    pthread_mutex_lock( &stateMut );
+    if (pakiet.ts > clockLamporta) clockLamporta = pakiet.ts;
+    pthread_mutex_unlock( &stateMut );
 }
 
+// Inkrementuj ackCount
+void incrementACK() {
+    pthread_mutex_lock(&stateMut);
+    ackCount++;
+    pthread_mutex_unlock(&stateMut);
+}
 
-void insertNode(struct list_element** queues, int room, int ts, int src, int game, int room) {
-    struct list_element* new_node = malloc(sizeof(struct list_element));
-    new_node->src = src;
-    new_node->ts = ts;
-    new_node->game = game;
-    new_node->room = room;
-    new_node->next = NULL;
+// Inkrementuj Clock
+void incrementClock() {
+    pthread_mutex_lock( &stateMut );
+    clockLamporta += 1;
+    pthread_mutex_unlock( &stateMut );
+}
 
-    if (queues[room] == NULL) {
-        queues[room] = new_node;
-    } else {
-        struct list_element* current = queues[room];
-        while (current->next != NULL) {
-            current = current->next;
-        }
-        current->next = new_node;
+// Wyzeruj ackCount
+void resetACK() {
+    pthread_mutex_lock(&stateMut);
+    ackCount = 0;
+    pthread_mutex_unlock(&stateMut);
+}
+
+// Wyczyść kolejkę pokoju
+void resetRoom( packet_t pakiet ) {
+    memset(&rooms[pakiet.room][0], 0, sizeof(packet_t));
+    memset(&rooms[pakiet.room][1], 0, sizeof(packet_t));
+    memset(&rooms[pakiet.room][2], 0, sizeof(packet_t));
+    memset(&rooms[pakiet.room][3], 0, sizeof(packet_t));
+}
+
+// Zapamiętaj moment rozpoczęcia ubiegania się
+void rememberRequestTS() {
+    pthread_mutex_lock(&stateMut);
+    lastRequestTS = clockLamporta;
+    pthread_mutex_unlock(&stateMut);
+}
+
+// Zlicz głosy z kolejki i napisz w co gramy
+void vote( packet_t pakiet ) {
+    int oldestGame = -1;
+    int gameOne = 0;
+    int gameTwo = 0;
+    int gameThree = 0;
+
+    for (int i = 0; i < 4; i++) {
+        if (rooms[pakiet.room][i].game == 0) gameOne++;
+        if (rooms[pakiet.room][i].game == 1) gameTwo++;
+        if (rooms[pakiet.room][i].game == 2) gameThree++;
+        if (rooms[pakiet.room][i].src > oldestGame) oldestGame = rooms[pakiet.room][i].src;
+    }
+
+    if (gameOne >= 2 && gameTwo < 2 && gameThree < 2) {
+        println("Rżniemy w karty: Rozbierany poker %d", ackCount);
+    }
+    else if (gameTwo >= 2 && gameOne < 2 && gameThree < 2) {
+        println("Rżniemy w karty: Brydż %d", ackCount);
+    }
+    else if (gameThree >= 2 && gameOne < 2 && gameTwo < 2) {
+        println("Rżniemy w karty: Wist %d", ackCount);
+    }
+    else {
+        println("Rżniemy w cokolwiek podyktuje młodziak : %d %d %d %d %d", rooms[pakiet.room][0].game, rooms[pakiet.room][1].game, rooms[pakiet.room][2].game, rooms[pakiet.room][3].game, ackCount);
     }
 }
 
-void removeNode(struct list_element** queues, int room, int src) {
-    if (queues[room] == NULL) {
-        return;
-    }
+// Roześlij ACK procesom zapisanym na liście
+void resendACK() {
+    pthread_mutex_lock(&ackQueue_mutex);
 
-    struct list_element* current = queues[room];
-    struct list_element* prev = NULL;
-
-    if (current != NULL && current->src == src) {
-        queues[room] = current->next;
-        free(current);
-        return;
-    }
-
-    while (current != NULL && current->src != src) {
-        prev = current;
-        current = current->next;
-    }
-
-    if (current == NULL) {
-        return;
-    }
-
-    prev->next = current->next;
-    free(current);
-}
-
-
-void printList(struct list_element* queues, int room) {
-    debug("---------------");
-    debug("Queue in Room %d", room);
-
-    struct list_element* current = queues[room];
-
-    while (current != NULL) {
-        debug("Source: %d, ts: %d, type: %s, room: %d", current->src, current->ts, type_array[current->type], current->room);
-        current = current->next;
-    }
-    debug("---------------");
-}
-
-
-int isElementInNElements(struct list_element* queues, int room, int src, int n, int game, int room) {
-    struct list_element* current = queues[room];
-    int count = 0;
-
-    while (current != NULL && count < n) {
-        if (current->room == room && current->game != game) {
-            return 0;
+    // Roześlij ACK procesom zapisanym na liście
+	packet_t *pkt = malloc(sizeof(packet_t));
+    for (int i = 0; i < ackQueue_SIZE; i++) {
+        if (ackQueue[i] == -1) break;
+			sendPacket( pkt, ackQueue[i], ACK);
+			ackQueue[i] = -1;
         }
+    // Zresetuj wskaźnik ostatniego elementu
+    last = 0;
 
-        if (current->src == src) {
-            return 1;
-        }
-
-        current = current->next;
-        if (current != NULL && current->room == room) {
-            count++;
-        }
-    }
-
-    return 0;
+    pthread_mutex_unlock(&ackQueue_mutex);
 }
-*/

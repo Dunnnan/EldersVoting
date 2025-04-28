@@ -8,19 +8,10 @@ typedef struct {
     int src;            /* source      (id procesu wysyłającego) */
     int game;           /* game        (id gry) */
     int room;           /* source      (id pokoju) */
-    int request_id;     /* request_id  (id requesta) */
 } packet_t;
-/* packet_t ma trzy pola, więc NITEMS=3. Wykorzystane w inicjuj_typ_pakietu */
-#define NITEMS 5
+/* packet_t ma trzy pola, więc NITEMS=4. Wykorzystane w inicjuj_typ_pakietu */
+#define NITEMS 4
 
-// kolejka
-struct list_element{
-    int ts;
-    int src;
-    int game;
-    int room;
-    struct list_element *next;
-};
 
 
 /* Typy wiadomości */
@@ -50,24 +41,30 @@ typedef enum {
     Waiting     // 6
    } state_t;   // 7
 
+
+// Zmienne synchronizacyjne
 extern state_t stan;
-extern pthread_mutex_t stateMut;
+extern pthread_mutex_t stateMut;        // do bezpiecznej  zmiany stanu i zmiennych z nim związanych
+extern pthread_mutex_t ackQueue_mutex;  // do bezpiecznego operowania na procesach, którym początkowo nie wysłaliśmy ACK
+extern sem_t inSection;                 // do bezpiecznego wchodzenia do sekcji krytycznej
+extern sem_t enoughACK;                 // do bezpiecznego wchodzenia w stan oczekiwania na innych graczy
 
-
-extern pthread_mutex_t ackQueue_mutex;
-
-
-/* zmiana stanu, obwarowana muteksem */
+// zmiana stanu
 void changeState( state_t );
 
 // obsługa REQ
 void handleRequest(packet_t);
 
-// kolejka
-void sortList(struct list_element** queues, int room);
-void insertNode(struct list_element** queues, int room, int timestamp, int src, int game);
-void removeNode(struct list_element** queues, int room, int source_rank);
-void printList(struct list_element* queues, int room);
-int isElementInNElements(struct list_element* queues, int room, int src, int x, int game);
+// Bezpieczne zmiany wartości
+void pickHigherClock(packet_t);
+void incrementClock();
+void incrementACK();
+void resetACK();
+void resetRoom(packet_t);
+void rememberRequestTS();
+
+// Inne
+void vote(packet_t);    // proces głosowania
+void resendACK();       // proces rozesłania ACK procesom, którym początkowo go nie wysłaliśmy
 
 #endif
