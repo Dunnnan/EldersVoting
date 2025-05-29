@@ -20,7 +20,7 @@
 // Stałe
 #define ROOT 0
 #define ROOMS 3             // liczba pokoi
-#define GAMES 1             // liczba gier
+#define GAMES 3             // liczba gier
 #define ackQueue_SIZE 10000 // rozmiar kolejki przechowującej id procesów, którym początkowo nie wysłaliśmy ACK ( > size)
 
 // Zmienne wątku (komunikacyjne)
