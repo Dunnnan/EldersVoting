@@ -12,9 +12,6 @@ void *startKomWatek(void *ptr)
     // Czy dodano gracza do kolejki pokoju
     bool isAdded = false;
 
-    // Losuj grę
-    game = random() % 3;
-
     while ( stan!=InFinish ) {
 	debug("czekam na recv");
         MPI_Recv( &pakiet, 1, MPI_PAKIET_T, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
@@ -22,16 +19,21 @@ void *startKomWatek(void *ptr)
         switch ( status.MPI_TAG ) {
 	    case REQUEST: 
 
+            // Zwiększ długość kolejki oczekujących graczy pokoju
+            incrementQueue(pakiet);
+
             // Sprawdź czy możesz wysłać ACK
             pthread_mutex_lock(&ackQueue_mutex);
+            pthread_mutex_lock(&stateMut);
+
             if
             (
                 pakiet.room != room ||
                 (
                     stan == InRun ||
                     (
-                        (pakiet.ts < lastRequestTS && pakiet.room == room) ||                       // != ts (porównanie ts)
-                        (pakiet.ts == lastRequestTS && pakiet.src < rank && pakiet.room == room)    // == ts (porównanie id)
+                        (pakiet.ts < lastRequestTS) ||                       // != ts (porównanie ts)
+                        (pakiet.ts == lastRequestTS && pakiet.src < rank)    // == ts (porównanie id)
                     )
                     &&
                     (
@@ -40,6 +42,7 @@ void *startKomWatek(void *ptr)
                     )
                 )
             ) {
+                pthread_mutex_unlock(&stateMut);
 
 		        // Podmień .ts
 		        pickHigherClock(pakiet);
@@ -48,6 +51,10 @@ void *startKomWatek(void *ptr)
 		        sendPacket( 0, status.MPI_SOURCE, ACK );
             }
             else {
+                pthread_mutex_unlock(&stateMut);
+
+		        // Podmień .ts
+		        pickHigherClock(pakiet);
 
                 // Zapisz pakiet jako oczekujący na ACK
                 ackQueue[last] = pakiet.src;
@@ -55,11 +62,12 @@ void *startKomWatek(void *ptr)
             }
 
             pthread_mutex_unlock(&ackQueue_mutex);
+
 	        break;
 	    case ACK:
 
             incrementACK();
-            debug("Dostałem ACK od %d, mam już %d", status.MPI_SOURCE, ackCount);
+            //println("Dostałem ACK od %d, mam już %d", status.MPI_SOURCE, ackCount);
 
 	        break;
 
@@ -70,7 +78,7 @@ void *startKomWatek(void *ptr)
 
             // Maksymalnie 4 procesy uprawnione do grania (4 miejsca)
             while (index < 4) {
-                // Jeżeli natrafiłeś na puste miejsce
+                // Jeżeli natrafiłeś na puste miejsce (wstaw na 1. puste miejsce)
                 if (rooms[pakiet.room][index].ts == 0) {
                     isAdded = true;
 
@@ -87,6 +95,7 @@ void *startKomWatek(void *ptr)
                             rooms[pakiet.room][2].src == rank ||
                             rooms[pakiet.room][3].src == rank
                         ) {
+                            
                             // Przeprowadź głosowanie
                             vote(pakiet);
 
@@ -97,6 +106,9 @@ void *startKomWatek(void *ptr)
 
                         // Wyczyść kolejkę uprawnionych do grania
                         resetRoom(pakiet);
+
+                        // Zmniejsz długość kolejki oczekujących graczy pokoju (4 weszło do sekcji)
+                        decrement4Queue(pakiet);
                     }
 
                 }

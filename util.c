@@ -1,14 +1,16 @@
 #include "main.h"
 #include "util.h"
 #include <semaphore.h>
+#include <limits.h>
+
 
 MPI_Datatype MPI_PAKIET_T;
 
 // Zmienne synchronizacyjne
-pthread_mutex_t stateMut = PTHREAD_MUTEX_INITIALIZER;       // do bezpiecznej  zmiany stanu i zmiennych z nim związanych
-pthread_mutex_t ackQueue_mutex = PTHREAD_MUTEX_INITIALIZER; // do bezpiecznego operowania na procesach, którym początkowo nie wysłaliśmy ACK
-sem_t inSection;                                            // do bezpiecznego wchodzenia do sekcji
-sem_t enoughACK;                                            // do bezpiecznego wchodzenia w stan oczekiwania na innych graczy
+pthread_mutex_t stateMut = PTHREAD_MUTEX_INITIALIZER;         // do bezpiecznej  zmiany stanu i zmiennych z nim związanych
+pthread_mutex_t ackQueue_mutex = PTHREAD_MUTEX_INITIALIZER;   // do bezpiecznego operowania na procesach, którym początkowo nie wysłaliśmy ACK
+pthread_mutex_t roomsQueue_mutex = PTHREAD_MUTEX_INITIALIZER; // do bezpiecznego operowania na długościach kolejek pokojów
+sem_t inSection;                                              // do bezpiecznego wchodzenia do sekcji
 
 state_t stan=InRun;
 
@@ -91,7 +93,8 @@ void changeState( state_t newState )
 // Nadpisz clock w przypadku otrzymania wiadomości o większym .ts
 void pickHigherClock( packet_t pakiet) {
     pthread_mutex_lock( &stateMut );
-    if (pakiet.ts > clockLamporta) clockLamporta = pakiet.ts;
+    if (pakiet.ts > clockLamporta) clockLamporta = pakiet.ts+1;
+    else clockLamporta++;
     pthread_mutex_unlock( &stateMut );
 }
 
@@ -131,6 +134,27 @@ void rememberRequestTS() {
     pthread_mutex_unlock(&stateMut);
 }
 
+// Zwiększ długość kolejki pokoju
+void incrementQueue(packet_t pakiet) {
+    pthread_mutex_lock(&roomsQueue_mutex);
+    roomsQueue[pakiet.room]++;
+    pthread_mutex_unlock(&roomsQueue_mutex);
+}
+
+// Zmniejsz długość kolejki pokoju (-4 - grupa weszła do sekcji)
+void decrement4Queue(packet_t pakiet) {
+    pthread_mutex_lock(&roomsQueue_mutex);
+    roomsQueue[pakiet.room] -= 4;
+    pthread_mutex_unlock(&roomsQueue_mutex);
+}
+
+// Zresetuj id pokoju wybranego do gry
+void resetPickedRoom() {
+    pthread_mutex_lock(&stateMut);
+    room = -1;
+    pthread_mutex_unlock(&stateMut);
+}
+
 // Zlicz głosy z kolejki i napisz w co gramy
 void vote( packet_t pakiet ) {
     int oldestGame = -1;
@@ -146,16 +170,16 @@ void vote( packet_t pakiet ) {
     }
 
     if (gameOne >= 2 && gameTwo < 2 && gameThree < 2) {
-        println("Rżniemy w karty: Rozbierany poker %d", ackCount);
+        println("Rżniemy w karty: Rozbierany poker %d Room: %d", ackCount, room);
     }
     else if (gameTwo >= 2 && gameOne < 2 && gameThree < 2) {
-        println("Rżniemy w karty: Brydż %d", ackCount);
+        println("Rżniemy w karty: Brydż %d Room: %d", ackCount, room);
     }
     else if (gameThree >= 2 && gameOne < 2 && gameTwo < 2) {
-        println("Rżniemy w karty: Wist %d", ackCount);
+        println("Rżniemy w karty: Wist %d Room: %d", ackCount, room);
     }
     else {
-        println("Rżniemy w cokolwiek podyktuje młodziak : %d %d %d %d %d", rooms[pakiet.room][0].game, rooms[pakiet.room][1].game, rooms[pakiet.room][2].game, rooms[pakiet.room][3].game, ackCount);
+        println("Rżniemy w cokolwiek podyktuje młodziak : %d %d %d %d %d", rooms[pakiet.room][0].room, rooms[pakiet.room][1].game, rooms[pakiet.room][2].game, rooms[pakiet.room][3].game, ackCount);
     }
 }
 
@@ -166,12 +190,50 @@ void resendACK() {
     // Roześlij ACK procesom zapisanym na liście
 	packet_t *pkt = malloc(sizeof(packet_t));
     for (int i = 0; i < ackQueue_SIZE; i++) {
-        if (ackQueue[i] == -1) break;
-			sendPacket( pkt, ackQueue[i], ACK);
-			ackQueue[i] = -1;
+        if (ackQueue[i] == -1) {
+            break;
         }
+        else if (ackQueue[i] == -10) {
+			ackQueue[i] = -1;
+            continue;
+        }
+
+		sendPacket( pkt, ackQueue[i], ACK);
+		ackQueue[i] = -1;
+    }
     // Zresetuj wskaźnik ostatniego elementu
     last = 0;
 
     pthread_mutex_unlock(&ackQueue_mutex);
+}
+
+// Wybierz najkorzystniejszy pokój
+int pickRoom() {
+    pthread_mutex_lock(&roomsQueue_mutex);
+
+    int min = INT_MAX;
+    int minRest = -1;
+    int room = 0;
+
+    for (int i = 0; i < ROOMS; i++) {
+        if (roomsQueue[i] == 3) {
+            room = i;
+            break;
+        }
+        if (roomsQueue[i] < min) {
+            room = i;
+            min = roomsQueue[i];
+            minRest = roomsQueue[i] % 4;
+        }
+        else if (roomsQueue[i] == min && (roomsQueue[i] % 4) > minRest) {
+            room = i;
+            minRest = roomsQueue[i] % 4;
+        }
+    }
+
+    roomsQueue[room]++;
+
+    pthread_mutex_unlock(&roomsQueue_mutex);
+
+    return room;
 }

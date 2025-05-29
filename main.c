@@ -11,6 +11,7 @@
 int ackCount = 0;
 int clockLamporta = 1;
 int lastRequestTS = 0;
+
 int last = 0;
 int ackQueue[ackQueue_SIZE];
 
@@ -26,6 +27,8 @@ pthread_t threadKom;
 // Kolejka oczekujących graczy pokoju
 packet_t rooms[ROOMS][4];
 
+// Kolejka graczy pokoju
+int roomsQueue[ROOMS];
 
 void finalizuj()
 {
@@ -67,6 +70,10 @@ int main(int argc, char **argv)
 
     //Inicjalizuj (ackQueue)
     for (int i = 0; i < ackQueue_SIZE; i++) ackQueue[i] = -1;
+   
+    //Inicjalizuj (roomQueue)
+//    bzero(roomsQueue[i], ROOMS);
+    for (int i = 0; i < ROOMS; i++) roomsQueue[i] = 0;
 
     MPI_Status status;
     int provided;

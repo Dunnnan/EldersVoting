@@ -44,10 +44,11 @@ typedef enum {
 
 // Zmienne synchronizacyjne
 extern state_t stan;
-extern pthread_mutex_t stateMut;        // do bezpiecznej  zmiany stanu i zmiennych z nim związanych
-extern pthread_mutex_t ackQueue_mutex;  // do bezpiecznego operowania na procesach, którym początkowo nie wysłaliśmy ACK
-extern sem_t inSection;                 // do bezpiecznego wchodzenia do sekcji krytycznej
-extern sem_t enoughACK;                 // do bezpiecznego wchodzenia w stan oczekiwania na innych graczy
+extern pthread_mutex_t stateMut;         // do bezpiecznej  zmiany stanu i zmiennych z nim związanych
+extern pthread_mutex_t ackQueue_mutex;   // do bezpiecznego operowania na procesach, którym początkowo nie wysłaliśmy ACK
+extern pthread_mutex_t roomsQueue_mutex; // do bezpiecznego operowania na długościach kolejek pokojów
+extern sem_t inSection;                  // do bezpiecznego wchodzenia do sekcji krytycznej
+extern sem_t enoughACK;                  // do bezpiecznego wchodzenia w stan oczekiwania na innych graczy
 
 // zmiana stanu
 void changeState( state_t );
@@ -62,9 +63,13 @@ void incrementACK();
 void resetACK();
 void resetRoom(packet_t);
 void rememberRequestTS();
+void incrementQueue(packet_t);
+void decrement4Queue(packet_t);
+void resetPickedRoom();
 
 // Inne
 void vote(packet_t);    // proces głosowania
 void resendACK();       // proces rozesłania ACK procesom, którym początkowo go nie wysłaliśmy
+int pickRoom();         // proces wyboru najkorzystniejszego pokoju (najszybsza szansa na grę)
 
 #endif

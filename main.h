@@ -20,6 +20,7 @@
 // Stałe
 #define ROOT 0
 #define ROOMS 3             // liczba pokoi
+#define GAMES 1             // liczba gier
 #define ackQueue_SIZE 10000 // rozmiar kolejki przechowującej id procesów, którym początkowo nie wysłaliśmy ACK ( > size)
 
 // Zmienne wątku (komunikacyjne)
@@ -40,6 +41,9 @@ extern pthread_t threadKom;
 
 // Kolejka oczekujących graczy pokoju
 extern packet_t rooms[ROOMS][4];
+
+// Kolejka graczy pokoju
+extern int roomsQueue[ROOMS];
 
 /* macro debug - działa jak printf, kiedy zdefiniowano
    DEBUG, kiedy DEBUG niezdefiniowane działa jak instrukcja pusta 

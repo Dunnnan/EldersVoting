@@ -2,7 +2,6 @@
 #include "watek_glowny.h"
 
 
-
 void mainLoop()
 {
     srandom(rank);
@@ -11,7 +10,7 @@ void mainLoop()
 
     // Semafor na czekanie aż zbiorą się 4 osoby.
     sem_init(&inSection, 0, 1);
-    room = random()%ROOMS;
+    room = -1;
 
     while (stan != InFinish) {
 	switch (stan) {
@@ -19,20 +18,21 @@ void mainLoop()
             perc = random()%100;
 
             if ( perc < 25 ) {
-                //println("Ubiegam się o sekcję krytyczną");
                 debug("Zmieniam stan na wysyłanie");
 
                 // Semafor na czekanie aż zbiorą się 4 osoby.
                 sem_wait(&inSection);
 
-                //Losuj grę i pokój
-                game = random()%3;
-                room = random()%ROOMS;
-
                 // Inicjalizuj ubieganie się
                 resetACK();
                 incrementClock();
                 rememberRequestTS();
+
+                // Losuj grę
+                game = random() % GAMES;
+
+                // Wybierz pokój z najkrótszą kolejką
+                room = pickRoom();
 
                 // Wyślij requesty
                 packet_t *pkt = malloc(sizeof(packet_t));
@@ -76,7 +76,7 @@ void mainLoop()
 
 	    case InSection:
             println("Jestem w sekcji krytycznej. room: %d", room);
-            sleep(1);
+            sleep(2);
 
             // Wyzeruj ACK
             resetACK();
@@ -84,10 +84,10 @@ void mainLoop()
 		    println("Wychodzę z sekcji krytycznej. room: %d", room)
 
             // Zresetuj pokój
-            room = -1;
+            resetPickedRoom();
 
             // Wyjdź z sekcji
-		    changeState( InRun );
+	        changeState( InRun );
 
             // Roześlij zapamiętane ACK
             resendACK();
@@ -97,7 +97,8 @@ void mainLoop()
             debug("WŁAŚNIE ZWOLNIŁEM SEMAFOR");
 
 
-		    break;
+	    break;
+
 	    default: 
 		    break;
         }
