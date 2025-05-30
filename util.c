@@ -92,10 +92,8 @@ void changeState( state_t newState )
 
 // Nadpisz clock w przypadku otrzymania wiadomości o większym .ts
 void pickHigherClock( packet_t pakiet) {
-    pthread_mutex_lock( &stateMut );
     if (pakiet.ts > clockLamporta) clockLamporta = pakiet.ts+1;
     else clockLamporta++;
-    pthread_mutex_unlock( &stateMut );
 }
 
 // Inkrementuj ackCount
@@ -107,16 +105,12 @@ void incrementACK() {
 
 // Inkrementuj Clock
 void incrementClock() {
-    pthread_mutex_lock( &stateMut );
     clockLamporta += 1;
-    pthread_mutex_unlock( &stateMut );
 }
 
 // Wyzeruj ackCount
 void resetACK() {
-    pthread_mutex_lock(&stateMut);
     ackCount = 0;
-    pthread_mutex_unlock(&stateMut);
 }
 
 // Wyczyść kolejkę pokoju
@@ -129,9 +123,8 @@ void resetRoom( packet_t pakiet ) {
 
 // Zapamiętaj moment rozpoczęcia ubiegania się
 void rememberRequestTS() {
-    pthread_mutex_lock(&stateMut);
+    stan = InWant;
     lastRequestTS = clockLamporta;
-    pthread_mutex_unlock(&stateMut);
 }
 
 // Zwiększ długość kolejki pokoju
@@ -179,7 +172,7 @@ void vote( packet_t pakiet ) {
         println("Rżniemy w karty: Wist %d Room: %d", ackCount, room);
     }
     else {
-        println("Rżniemy w cokolwiek podyktuje młodziak : %d %d %d %d %d", rooms[pakiet.room][0].room, rooms[pakiet.room][1].game, rooms[pakiet.room][2].game, rooms[pakiet.room][3].game, ackCount);
+        println("Rżniemy w cokolwiek podyktuje młodziak : %d %d %d %d %d Room: %d", rooms[pakiet.room][0].game, rooms[pakiet.room][1].game, rooms[pakiet.room][2].game, rooms[pakiet.room][3].game, ackCount, rooms[pakiet.room][0].room);
     }
 }
 

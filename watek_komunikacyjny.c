@@ -22,7 +22,6 @@ void *startKomWatek(void *ptr)
             // Zwiększ długość kolejki oczekujących graczy pokoju
             incrementQueue(pakiet);
 
-            // Sprawdź czy możesz wysłać ACK
             pthread_mutex_lock(&ackQueue_mutex);
             pthread_mutex_lock(&stateMut);
 
@@ -42,7 +41,6 @@ void *startKomWatek(void *ptr)
                     )
                 )
             ) {
-                pthread_mutex_unlock(&stateMut);
 
 		        // Podmień .ts
 		        pickHigherClock(pakiet);
@@ -51,7 +49,6 @@ void *startKomWatek(void *ptr)
 		        sendPacket( 0, status.MPI_SOURCE, ACK );
             }
             else {
-                pthread_mutex_unlock(&stateMut);
 
 		        // Podmień .ts
 		        pickHigherClock(pakiet);
@@ -61,13 +58,14 @@ void *startKomWatek(void *ptr)
                 last++;
             }
 
+            pthread_mutex_unlock(&stateMut);
             pthread_mutex_unlock(&ackQueue_mutex);
 
 	        break;
 	    case ACK:
 
             incrementACK();
-            //println("Dostałem ACK od %d, mam już %d", status.MPI_SOURCE, ackCount);
+//            println("Dostałem ACK od %d, mam już %d", status.MPI_SOURCE, ackCount);
 
 	        break;
 

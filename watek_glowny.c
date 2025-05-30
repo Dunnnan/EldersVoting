@@ -20,13 +20,15 @@ void mainLoop()
             if ( perc < 25 ) {
                 debug("Zmieniam stan na wysyłanie");
 
+                pthread_mutex_lock(&stateMut);
+
                 // Semafor na czekanie aż zbiorą się 4 osoby.
                 sem_wait(&inSection);
 
                 // Inicjalizuj ubieganie się
                 resetACK();
                 incrementClock();
-                rememberRequestTS();
+                rememberRequestTS();        // <- changeState( InWant)
 
                 // Losuj grę
                 game = random() % GAMES;
@@ -41,8 +43,7 @@ void mainLoop()
                     sendPacket( pkt, i, REQUEST);
                 free(pkt);
 
-                // Zacznij ubiegać się o sekcję
-                changeState( InWant );
+                pthread_mutex_unlock(&stateMut);
 
                 debug("Skończyłem myśleć I CHCĘ WEJŚĆ DO SEKCJI BO MAM FAJNY PROCENT");
             }
@@ -75,8 +76,8 @@ void mainLoop()
             break;
 
 	    case InSection:
-            println("Jestem w sekcji krytycznej. room: %d", room);
-            sleep(2);
+//            println("Jestem w sekcji krytycznej. room: %d", room);
+            sleep(3);
 
             // Wyzeruj ACK
             resetACK();
